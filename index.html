@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XTREME Mining - Entrevistas Operacionales PRO</title>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#eef3f8;
+      --card:#ffffff;
+      --text:#17202a;
+      --muted:#5b6573;
+      --line:#dbe4ee;
+      --primary:#9d1117;
+      --primary-2:#c61c24;
+      --dark:#111827;
+      --ok:#0c8a5f;
+      --bad:#c0392b;
+      --warn:#b9770e;
+      --pdf:#2563eb;
+      --shadow:0 16px 40px rgba(16,24,40,.10);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(157,17,23,.06), transparent 30%),
+        linear-gradient(180deg,#f4f7fb 0%, #eef3f8 100%);
+    }
+    .wrap{max-width:1280px;margin:24px auto;padding:0 16px 30px;}
+    .hero{
+      background:linear-gradient(135deg,#0f172a 0%, #111827 55%, #7f1d1d 100%);
+      color:#fff;border-radius:26px;padding:22px 24px;box-shadow:var(--shadow);margin-bottom:18px;
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .hero-top{display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
+    .logo-box{
+      background:rgba(255,255,255,.96);border-radius:16px;padding:10px 14px;display:flex;align-items:center;
+      min-width:260px;box-shadow:0 10px 24px rgba(0,0,0,.15);
+    }
+    .logo-box img{max-width:320px;width:100%;height:auto;display:block;}
+    .hero h1{margin:0 0 6px;font-size:30px;line-height:1.05;}
+    .hero p{margin:0;color:rgba(255,255,255,.88);max-width:760px;}
+    .grid{display:grid;grid-template-columns:430px 1fr;gap:18px;}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);overflow:hidden;}
+    .card-head{padding:18px 20px 10px;background:linear-gradient(180deg,#fff 0%, #fbfcfe 100%);border-bottom:1px solid #edf2f7;}
+    .card-head h2{margin:0;font-size:20px;color:var(--dark);}
+    .sub{color:var(--muted);font-size:13px;margin-top:4px;}
+    .card-body{padding:18px 20px 20px;}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+    .full{grid-column:1 / -1;}
+    label{font-size:13px;font-weight:700;color:#1f2937;}
+    input, select, textarea{
+      width:100%;border:1px solid #cfd8e3;border-radius:12px;padding:12px 12px;font-size:14px;
+      outline:none;background:#fff;transition:.18s ease;
+    }
+    input:focus, select:focus, textarea:focus{
+      border-color:var(--primary-2);box-shadow:0 0 0 4px rgba(198,28,36,.10);
+    }
+    textarea{min-height:105px;resize:vertical;}
+    .select-help{font-size:12px;color:var(--muted);margin-top:2px;}
+    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+    .chip{background:#f4f6f8;border:1px solid #dde5ee;color:#1f2937;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:700;}
+    .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;}
+    button{border:none;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer;transition:.18s ease;}
+    button:hover{transform:translateY(-1px)}
+    .btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-2));color:#fff;}
+    .btn-secondary{background:#e9eef5;color:#23313f;}
+    .btn-success{background:var(--ok);color:#fff;}
+    .btn-danger{background:var(--bad);color:#fff;}
+    .btn-pdf{background:var(--pdf);color:#fff;}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
+    .stat{border:1px solid var(--line);border-radius:16px;padding:16px;background:linear-gradient(180deg,#fff,#fafcff);}
+    .stat .n{font-size:30px;font-weight:800;margin-bottom:4px;}
+    .stat .t{color:var(--muted);font-size:13px;font-weight:700;}
+    .filters{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0 14px;}
+    .table-wrap{overflow:auto;max-height:620px;border:1px solid var(--line);border-radius:16px;}
+    table{width:100%;border-collapse:collapse;font-size:14px;background:#fff;}
+    thead th{text-align:left;padding:12px 10px;background:#f3f6fa;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1;}
+    tbody td{padding:12px 10px;border-bottom:1px solid #edf1f6;vertical-align:top;}
+    tbody tr:hover{background:#fafcff;}
+    .tag{display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap;}
+    .approved{background:rgba(12,138,95,.12);color:var(--ok);}
+    .rejected{background:rgba(192,57,43,.12);color:var(--bad);}
+    .pending{background:rgba(185,119,14,.12);color:var(--warn);}
+    .mini-btn{padding:8px 10px;border-radius:10px;font-size:12px;font-weight:700;margin:0 6px 6px 0;}
+    .muted{color:var(--muted);font-size:12px;}
+    .footer-note{margin-top:10px;font-size:12px;color:var(--muted);}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .topline{display:flex;justify-content:space-between;gap:16px;align-items:end;flex-wrap:wrap;}
+    .banner-note{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      background:#eff6ff;
+      border:1px solid #bfdbfe;
+      color:#1e3a8a;
+      font-size:12px;
+      font-weight:700;
+    }
+    @media (max-width: 980px) {
+      .grid{grid-template-columns:1fr}
+      .stats{grid-template-columns:repeat(2,1fr)}
+      .filters{grid-template-columns:1fr 1fr}
+    }
+    @media (max-width: 640px) {
+      .form-grid,.filters,.stats{grid-template-columns:1fr}
+      .hero h1{font-size:24px}
+      .logo-box{min-width:unset;width:100%;max-width:360px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="hero-top">
+        <div>
+          <h1>Entrevistas Operacionales</h1>
+          <p>Versión PRO para registro de postulantes, validación de equipos que opera, cargo al que postula, fecha de entrevista y resultado final.</p>
+          <div class="banner-note">Nuevo: botón para guardar y descargar PDF. Cada entrevista se almacena primero en la base local del navegador.</div>
+        </div>
+        <div class="logo-box">
+          <img alt="XTREME Mining Ltda." src="data:image/svg+xml;utf8,
+          <svg xmlns='http://www.w3.org/2000/svg' width='320' height='72'>
+            <rect width='100%%' height='100%%' rx='12' fill='white'/>
+            <text x='18' y='32' font-family='Arial' font-size='26' font-weight='700' fill='%239d1117'>XTREME</text>
+            <text x='18' y='55' font-family='Arial' font-size='20' font-weight='700' fill='%23111827'>Mining Ltda.</text>
+          </svg>"/>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <div class="card-head">
+          <h2>Formulario de entrevista</h2>
+          <div class="sub">Registro de postulante, cargo, equipos y observaciones del entrevistador.</div>
+        </div>
+        <div class="card-body">
+          <form id="interviewForm">
+            <input type="hidden" id="editId" />
+            <div class="form-grid">
+              <div class="field full">
+                <label for="nombre">Nombre completo</label>
+                <input id="nombre" required placeholder="Ej.: Juan Pérez Soto" />
+              </div>
+
+              <div class="field">
+                <label for="rut">RUT</label>
+                <input id="rut" placeholder="Ej.: 12.345.678-9" />
+              </div>
+
+              <div class="field">
+                <label for="telefono">Teléfono</label>
+                <input id="telefono" placeholder="+56 9 1234 5678" />
+              </div>
+
+              <div class="field full">
+                <label for="correo">Correo electrónico</label>
+                <input id="correo" type="email" placeholder="correo@empresa.cl" />
+              </div>
+
+              <div class="field">
+                <label for="fecha">Fecha entrevista</label>
+                <input id="fecha" type="date" required />
+              </div>
+
+              <div class="field">
+                <label for="cargo">Cargo al que postula</label>
+                <input id="cargo" required placeholder="Ej.: Operador Jumbo" />
+              </div>
+
+              <div class="field full">
+                <label for="equipos">Equipos que opera</label>
+                <select id="equipos" multiple size="10" required>
+                  <option>Scoop ST1030</option>
+                  <option>Retroexcavadora JCB</option>
+                  <option>Manipulador telescópico JCB</option>
+                  <option>Acuñador Resemin</option>
+                  <option>Jumbo S1D</option>
+                  <option>Jumbo Simba S7D</option>
+                  <option>Boltec M</option>
+                  <option>Mixer Tornado S2</option>
+                  <option>Roboshot Alpha 30</option>
+                  <option>Roboshot Alpha 20</option>
+		  <option>Camión Tova</option>
+                </select>
+                <div class="select-help">Mantén presionada la tecla Ctrl o Cmd para seleccionar varios equipos.</div>
+                <div id="selectedChips" class="chips"></div>
+              </div>
+
+              <div class="field">
+                <label for="experiencia">Años de experiencia</label>
+                <input id="experiencia" type="number" min="0" step="0.5" placeholder="Ej.: 5" />
+              </div>
+
+              <div class="field">
+                <label for="estado">Estado de entrevista</label>
+                <select id="estado" required>
+                  <option value="Pendiente">Pendiente</option>
+                  <option value="Aprobado">Aprobado</option>
+                  <option value="Rechazado">Rechazado</option>
+		  <option value="Proceso">Proceso</option>
+                </select>
+              </div>
+
+              <div class="field full">
+                <label for="observaciones">Observaciones</label>
+                <textarea id="observaciones" placeholder="Competencias observadas, licencias, fortalezas, brechas técnicas, disponibilidad, comentarios del entrevistador, etc."></textarea>
+              </div>
+            </div>
+
+            <div class="btns">
+              <button class="btn-primary" type="submit">Guardar entrevista</button>
+              <button class="btn-pdf" type="button" id="savePdfBtn">Guardar y descargar PDF</button>
+              <button class="btn-secondary" type="button" id="resetBtn">Limpiar formulario</button>
+            </div>
+          </form>
+          <div class="footer-note">La información queda guardada en este navegador mediante LocalStorage. El PDF adicional se genera desde el registro guardado.</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <div class="topline">
+            <div>
+              <h2>Panel de control</h2>
+              <div class="sub">Filtros, edición, eliminación, exportación y PDF individual.</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="stats">
+            <div class="stat"><div class="n" id="stTotal">0</div><div class="t">Total entrevistas</div></div>
+            <div class="stat"><div class="n" id="stAprobado">0</div><div class="t">Aprobados</div></div>
+            <div class="stat"><div class="n" id="stRechazado">0</div><div class="t">Rechazados</div></div>
+            <div class="stat"><div class="n" id="stPendiente">0</div><div class="t">Pendientes</div></div>
+          </div>
+
+          <div class="filters">
+            <div class="field">
+              <label for="filtroTexto">Buscar</label>
+              <input id="filtroTexto" placeholder="Nombre, cargo, RUT, equipo." />
+            </div>
+            <div class="field">
+              <label for="filtroEstado">Estado</label>
+              <select id="filtroEstado">
+                <option value="">Todos</option>
+                <option value="Aprobado">Aprobado</option>
+                <option value="Rechazado">Rechazado</option>
+                <option value="Pendiente">Pendiente</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="filtroCargo">Cargo</label>
+              <input id="filtroCargo" placeholder="Filtrar por cargo" />
+            </div>
+            <div class="field">
+              <label>&nbsp;</label>
+              <div class="toolbar">
+                <button class="btn-success" type="button" id="exportBtn">Exportar CSV</button>
+                <button class="btn-pdf" type="button" id="exportAllPdfBtn">Resumen PDF</button>
+                <button class="btn-danger" type="button" id="clearAllBtn">Borrar todo</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Postulante</th>
+                  <th>Cargo</th>
+                  <th>Equipos</th>
+                  <th>Estado</th>
+                  <th>Observaciones</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tablaBody"></tbody>
+            </table>
+          </div>
+          <div class="footer-note">Cada fila ahora incluye un botón PDF para descargar la entrevista ya guardada en la base local.</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'xtreme_entrevistas_operacionales_v3';
+
+    const $ = id => document.getElementById(id);
+
+    const form = $('interviewForm');
+    const editId = $('editId');
+    const nombre = $('nombre');
+    const rut = $('rut');
+    const telefono = $('telefono');
+    const correo = $('correo');
+    const fecha = $('fecha');
+    const cargo = $('cargo');
+    const equipos = $('equipos');
+    const experiencia = $('experiencia');
+    const estado = $('estado');
+    const observaciones = $('observaciones');
+
+    const filtroTexto = $('filtroTexto');
+    const filtroEstado = $('filtroEstado');
+    const filtroCargo = $('filtroCargo');
+    const tablaBody = $('tablaBody');
+
+    const stTotal = $('stTotal');
+    const stAprobado = $('stAprobado');
+    const stRechazado = $('stRechazado');
+    const stPendiente = $('stPendiente');
+
+    function loadData(){
+      try{
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      }catch(e){
+        return [];
+      }
+    }
+
+    function saveData(data){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function getSelectedEquipos(){
+      return Array.from(equipos.selectedOptions).map(o => o.value);
+    }
+
+    function renderChips(values = getSelectedEquipos()){
+      $('selectedChips').innerHTML = values.map(v => `<span class="chip">${escapeHtml(v)}</span>`).join('');
+    }
+
+    function resetForm(){
+      form.reset();
+      editId.value = '';
+      estado.value = 'Pendiente';
+      fecha.valueAsDate = new Date();
+      Array.from(equipos.options).forEach(o => o.selected = false);
+      renderChips([]);
+    }
+
+    function getStatusClass(value){
+      if(value === 'Aprobado') return 'approved';
+      if(value === 'Rechazado') return 'rejected';
+      return 'pending';
+    }
+
+    function escapeHtml(text){
+      return String(text ?? '')
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'","&#039;");
+    }
+
+    function buildRecordFromForm(){
+      return {
+        id: editId.value || (window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+        nombre: nombre.value.trim(),
+        rut: rut.value.trim(),
+        telefono: telefono.value.trim(),
+        correo: correo.value.trim(),
+        fecha: fecha.value,
+        cargo: cargo.value.trim(),
+        equipos: getSelectedEquipos(),
+        experiencia: experiencia.value.trim(),
+        estado: estado.value,
+        observaciones: observaciones.value.trim(),
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    function validateRecord(record){
+      if(!record.nombre) { alert('Ingresa el nombre del postulante.'); return false; }
+      if(!record.fecha) { alert('Ingresa la fecha de entrevista.'); return false; }
+      if(!record.cargo) { alert('Ingresa el cargo al que postula.'); return false; }
+      if(!record.equipos.length) { alert('Selecciona al menos un equipo.'); return false; }
+      return true;
+    }
+
+    function upsertRecord(record){
+      const data = loadData();
+      const idx = data.findIndex(x => x.id === record.id);
+      if(idx >= 0) data[idx] = record;
+      else data.push(record);
+      saveData(data);
+      return record;
+    }
+
+    function saveCurrentRecord(){
+      const record = buildRecordFromForm();
+      if(!validateRecord(record)) return null;
+      upsertRecord(record);
+      render();
+      return record;
+    }
+
+    function render(){
+      const data = loadData();
+
+      const text = filtroTexto.value.trim().toLowerCase();
+      const est = filtroEstado.value;
+      const car = filtroCargo.value.trim().toLowerCase();
+
+      const filtered = data.filter(r => {
+        const blob = [
+          r.nombre, r.rut, r.telefono, r.correo, r.cargo, (r.equipos || []).join(' '), r.estado, r.observaciones
+        ].join(' ').toLowerCase();
+
+        const okText = !text || blob.includes(text);
+        const okEstado = !est || r.estado === est;
+        const okCargo = !car || (r.cargo || '').toLowerCase().includes(car);
+        return okText && okEstado && okCargo;
+      });
+
+      tablaBody.innerHTML = '';
+      filtered
+        .sort((a,b) => (b.fecha || '').localeCompare(a.fecha || ''))
+        .forEach(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${escapeHtml(row.fecha)}<div class="muted">${escapeHtml(row.rut)}</div></td>
+            <td>
+              <strong>${escapeHtml(row.nombre)}</strong>
+              <div class="muted">${escapeHtml(row.telefono)}</div>
+              <div class="muted">${escapeHtml(row.correo)}</div>
+            </td>
+            <td>${escapeHtml(row.cargo)}<div class="muted">${row.experiencia ? escapeHtml(String(row.experiencia)) + ' años' : ''}</div></td>
+            <td>${escapeHtml((row.equipos || []).join(', '))}</td>
+            <td><span class="tag ${getStatusClass(row.estado)}">${escapeHtml(row.estado)}</span></td>
+            <td>${escapeHtml(row.observaciones)}</td>
+            <td>
+              <button class="mini-btn btn-secondary" onclick="editRecord('${row.id}')">Editar</button>
+              <button class="mini-btn btn-pdf" onclick="downloadRecordPdf('${row.id}')">PDF</button>
+              <button class="mini-btn btn-danger" onclick="deleteRecord('${row.id}')">Eliminar</button>
+            </td>
+          `;
+          tablaBody.appendChild(tr);
+        });
+
+      stTotal.textContent = data.length;
+      stAprobado.textContent = data.filter(x => x.estado === 'Aprobado').length;
+      stRechazado.textContent = data.filter(x => x.estado === 'Rechazado').length;
+      stPendiente.textContent = data.filter(x => x.estado === 'Pendiente').length;
+    }
+
+    function addWrappedText(doc, text, x, y, maxWidth, lineHeight){
+      const lines = doc.splitTextToSize(String(text || '-'), maxWidth);
+      doc.text(lines, x, y);
+      return y + (lines.length * lineHeight);
+    }
+
+    function generatePdf(record){
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit:'mm', format:'a4' });
+      const margin = 15;
+      let y = 18;
+
+      doc.setFillColor(15, 23, 42);
+      doc.rect(0, 0, 210, 30, 'F');
+      doc.setTextColor(255,255,255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('ENTREVISTA OPERACIONAL', margin, 15);
+      doc.setFontSize(11);
+      doc.text('XTREME Mining Ltda.', margin, 23);
+
+      doc.setTextColor(23,32,42);
+      y = 40;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Datos del postulante', margin, y);
+      y += 8;
+
+      const fields = [
+        ['Nombre completo', record.nombre],
+        ['RUT', record.rut || '-'],
+        ['Teléfono', record.telefono || '-'],
+        ['Correo', record.correo || '-'],
+        ['Fecha entrevista', record.fecha || '-'],
+        ['Cargo al que postula', record.cargo || '-'],
+        ['Equipos que opera', (record.equipos || []).join(', ') || '-'],
+        ['Años de experiencia', record.experiencia || '-'],
+        ['Estado', record.estado || '-'],
+        ['Observaciones', record.observaciones || '-']
+      ];
+
+      fields.forEach(([label, value], index) => {
+        if(y > 260){
+          doc.addPage();
+          y = 20;
+        }
+        doc.setFillColor(index % 2 === 0 ? 245 : 251, 247, 250);
+        doc.roundedRect(margin, y - 5, 180, 10, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text(label + ':', margin + 3, y + 1.5);
+        doc.setFont('helvetica', 'normal');
+        y = addWrappedText(doc, value, 65, y + 1.5, 125, 5);
+        y += 5;
+      });
+
+      doc.setFontSize(8);
+      doc.setTextColor(90, 101, 115);
+      doc.text('Documento generado desde la base local del formulario HTML.', margin, 287);
+      doc.save(`Entrevista_${sanitizeFileName(record.nombre || 'postulante')}.pdf`);
+    }
+
+    function sanitizeFileName(text){
+      return String(text || 'archivo')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\w\-]+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+    }
+
+    window.editRecord = function(id){
+      const r = loadData().find(x => x.id === id);
+      if(!r) return;
+      editId.value = r.id;
+      nombre.value = r.nombre || '';
+      rut.value = r.rut || '';
+      telefono.value = r.telefono || '';
+      correo.value = r.correo || '';
+      fecha.value = r.fecha || '';
+      cargo.value = r.cargo || '';
+      experiencia.value = r.experiencia || '';
+      estado.value = r.estado || 'Pendiente';
+      observaciones.value = r.observaciones || '';
+      Array.from(equipos.options).forEach(o => o.selected = (r.equipos || []).includes(o.value));
+      renderChips(r.equipos || []);
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    window.deleteRecord = function(id){
+      if(!confirm('¿Deseas eliminar este registro?')) return;
+      saveData(loadData().filter(x => x.id !== id));
+      render();
+    }
+
+    window.downloadRecordPdf = function(id){
+      const record = loadData().find(x => x.id === id);
+      if(!record) return alert('No se encontró el registro.');
+      generatePdf(record);
+    }
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const record = saveCurrentRecord();
+      if(record){
+        resetForm();
+        render();
+      }
+    });
+
+    $('savePdfBtn').addEventListener('click', () => {
+      const record = saveCurrentRecord();
+      if(!record) return;
+      generatePdf(record);
+      resetForm();
+      render();
+    });
+
+    $('resetBtn').addEventListener('click', resetForm);
+
+    $('clearAllBtn').addEventListener('click', () => {
+      if(!confirm('Esto eliminará todos los registros guardados en este navegador. ¿Continuar?')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      resetForm();
+      render();
+    });
+
+    $('exportBtn').addEventListener('click', () => {
+      const data = loadData();
+      if(!data.length) {
+        alert('No hay datos para exportar.');
+        return;
+      }
+      const headers = ['Fecha','Nombre','RUT','Telefono','Correo','Cargo','Equipos','Experiencia','Estado','Observaciones'];
+      const rows = data.map(r => [
+        r.fecha, r.nombre, r.rut, r.telefono, r.correo, r.cargo, (r.equipos || []).join(' | '), r.experiencia, r.estado, r.observaciones
+      ]);
+      const csv = [headers, ...rows]
+        .map(row => row.map(value => `"${String(value ?? '').replaceAll('"','""')}"`).join(';'))
+        .join('\n');
+
+      const blob = new Blob(["\ufeff" + csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'entrevistas_xtreme_mining.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    $('exportAllPdfBtn').addEventListener('click', () => {
+      const data = loadData();
+      if(!data.length) return alert('No hay registros guardados.');
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit:'mm', format:'a4' });
+      let y = 15;
+
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(16);
+      doc.text('Resumen de entrevistas operacionales', 14, y);
+      y += 8;
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(10);
+      doc.text(`Total registros: ${data.length}`, 14, y);
+      y += 8;
+
+      data.sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '')).forEach((r, idx) => {
+        if(y > 260){
+          doc.addPage();
+          y = 15;
+        }
+        doc.setFont('helvetica','bold');
+        doc.text(`${idx + 1}. ${r.nombre}`, 14, y);
+        y += 5;
+        doc.setFont('helvetica','normal');
+        const block = [
+          `Fecha: ${r.fecha || '-'}`,
+          `Cargo: ${r.cargo || '-'}`,
+          `Equipos: ${(r.equipos || []).join(', ') || '-'}`,
+          `Estado: ${r.estado || '-'}`,
+          `Observaciones: ${r.observaciones || '-'}`
+        ];
+        block.forEach(line => {
+          const lines = doc.splitTextToSize(line, 180);
+          doc.text(lines, 18, y);
+          y += lines.length * 4.5;
+        });
+        y += 4;
+      });
+
+      doc.save('Resumen_entrevistas_operacionales.pdf');
+    });
+
+    equipos.addEventListener('change', () => renderChips());
+    [filtroTexto, filtroCargo].forEach(el => el.addEventListener('input', render));
+    filtroEstado.addEventListener('change', render);
+
+    resetForm();
+    render();
+  </script>
+</body>
+</html>
