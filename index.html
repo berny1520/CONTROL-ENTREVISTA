@@ -103,6 +103,8 @@
       font-size:12px;
       font-weight:700;
     }
+    .sync-status{margin-top:10px;display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:#f8fafc;border:1px solid #dbe4ee;color:#334155;font-size:12px;font-weight:800;}
+    .dot{width:9px;height:9px;border-radius:999px;background:#b9770e;display:inline-block}.dot.ok{background:#0c8a5f}.dot.bad{background:#c0392b}
     @media (max-width: 980px) {
       .grid{grid-template-columns:1fr}
       .stats{grid-template-columns:repeat(2,1fr)}
@@ -122,7 +124,7 @@
         <div>
           <h1>Entrevistas Operacionales</h1>
           <p>Versión PRO para registro de postulantes, validación de equipos que opera, cargo al que postula, fecha de entrevista y resultado final.</p>
-          <div class="banner-note">Nuevo: botón para guardar y descargar PDF. Cada entrevista se almacena primero en la base local del navegador.</div>
+          <div class="banner-note">Base online compartida: las entrevistas se guardan en Google Sheets para que cualquier persona con el link vea la misma información.</div>
         </div>
         <div class="logo-box">
           <img alt="XTREME Mining Ltda." src="data:image/svg+xml;utf8,
@@ -226,7 +228,7 @@
               <button class="btn-secondary" type="button" id="resetBtn">Limpiar formulario</button>
             </div>
           </form>
-          <div class="footer-note">La información queda guardada en este navegador mediante LocalStorage. El PDF adicional se genera desde el registro guardado.</div>
+          <div class="footer-note">La información se guarda en Google Sheets mediante Apps Script. Si el enlace está configurado, todos verán la misma base compartida.</div>
         </div>
       </section>
 
@@ -235,7 +237,8 @@
           <div class="topline">
             <div>
               <h2>Panel de control</h2>
-              <div class="sub">Filtros, edición, eliminación, exportación y PDF individual.</div>
+              <div class="sub">Filtros, edición, eliminación, exportación, PDF individual y sincronización online.</div>
+              <div class="sync-status"><span id="syncDot" class="dot"></span><span id="syncStatus">Sincronizando...</span></div>
             </div>
           </div>
         </div>
@@ -291,373 +294,112 @@
               <tbody id="tablaBody"></tbody>
             </table>
           </div>
-          <div class="footer-note">Cada fila ahora incluye un botón PDF para descargar la entrevista ya guardada en la base local.</div>
+          <div class="footer-note">Cada fila incluye edición, PDF individual y eliminación sobre la base compartida.</div>
         </div>
       </section>
     </div>
   </div>
 
   <script>
-    const STORAGE_KEY = 'xtreme_entrevistas_operacionales_v3';
-
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz5NNPTxskn8nXXuKMi9RyHW1ePzVKv4ZY5q-LnZqXssPH1hmRKnPTTFewbm-PnyvjX/exec';
+    const LOCAL_BACKUP_KEY = 'xtreme_entrevistas_online_backup_v1';
     const $ = id => document.getElementById(id);
 
-    const form = $('interviewForm');
-    const editId = $('editId');
-    const nombre = $('nombre');
-    const rut = $('rut');
-    const telefono = $('telefono');
-    const correo = $('correo');
-    const fecha = $('fecha');
-    const cargo = $('cargo');
-    const equipos = $('equipos');
-    const experiencia = $('experiencia');
-    const estado = $('estado');
-    const observaciones = $('observaciones');
+    const form = $('interviewForm'), editId = $('editId'), nombre = $('nombre'), rut = $('rut'), telefono = $('telefono'), correo = $('correo'), fecha = $('fecha'), cargo = $('cargo'), equipos = $('equipos'), experiencia = $('experiencia'), estado = $('estado'), observaciones = $('observaciones');
+    const filtroTexto = $('filtroTexto'), filtroEstado = $('filtroEstado'), filtroCargo = $('filtroCargo'), tablaBody = $('tablaBody');
+    const stTotal = $('stTotal'), stAprobado = $('stAprobado'), stRechazado = $('stRechazado'), stPendiente = $('stPendiente'), syncDot = $('syncDot'), syncStatus = $('syncStatus');
+    let DATA = [];
 
-    const filtroTexto = $('filtroTexto');
-    const filtroEstado = $('filtroEstado');
-    const filtroCargo = $('filtroCargo');
-    const tablaBody = $('tablaBody');
+    function isConfigured(){ return APPS_SCRIPT_URL && !APPS_SCRIPT_URL.includes('TU_URL_DE_APPS_SCRIPT_AQUI'); }
+    function setSyncStatus(text, type='warn'){ if(!syncStatus || !syncDot) return; syncStatus.textContent = text; syncDot.className = 'dot' + (type === 'ok' ? ' ok' : type === 'bad' ? ' bad' : ''); }
 
-    const stTotal = $('stTotal');
-    const stAprobado = $('stAprobado');
-    const stRechazado = $('stRechazado');
-    const stPendiente = $('stPendiente');
-
-    function loadData(){
-      try{
-        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-      }catch(e){
-        return [];
-      }
+    function api(action, payload = {}){
+      return new Promise((resolve, reject) => {
+        if(!isConfigured()) return reject(new Error('Falta configurar APPS_SCRIPT_URL en el HTML.'));
+        const callbackName = 'xtremeCb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+        const script = document.createElement('script');
+        const params = new URLSearchParams({ action, payload: JSON.stringify(payload), callback: callbackName, t: String(Date.now()) });
+        const timeout = setTimeout(() => { cleanup(); reject(new Error('Tiempo de espera agotado al conectar con Google Sheets.')); }, 20000);
+        function cleanup(){ clearTimeout(timeout); try { delete window[callbackName]; } catch(e) { window[callbackName] = undefined; } if(script.parentNode) script.parentNode.removeChild(script); }
+        window[callbackName] = response => { cleanup(); if(response && response.ok) resolve(response); else reject(new Error((response && response.error) || 'Error desconocido en Apps Script.')); };
+        script.onerror = () => { cleanup(); reject(new Error('No se pudo cargar Apps Script. Revisa URL y permisos de despliegue.')); };
+        script.src = APPS_SCRIPT_URL + '?' + params.toString();
+        document.body.appendChild(script);
+      });
     }
 
-    function saveData(data){
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    function localBackupSave(data){ localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(data || [])); }
+    function localBackupLoad(){ try { return JSON.parse(localStorage.getItem(LOCAL_BACKUP_KEY)) || []; } catch(e) { return []; } }
+
+    async function loadData(){
+      if(!isConfigured()){ DATA = localBackupLoad(); setSyncStatus('Modo local: pega la URL de Apps Script', 'bad'); render(); return DATA; }
+      setSyncStatus('Sincronizando con Google Sheets...', 'warn');
+      try{ const res = await api('list'); DATA = Array.isArray(res.data) ? res.data : []; localBackupSave(DATA); setSyncStatus('Online: base compartida activa', 'ok'); }
+      catch(err){ console.error(err); DATA = localBackupLoad(); setSyncStatus('Sin conexión a Sheets: mostrando respaldo local', 'bad'); }
+      render(); return DATA;
     }
 
-    function getSelectedEquipos(){
-      return Array.from(equipos.selectedOptions).map(o => o.value);
+    async function saveRecordOnline(record){
+      if(!isConfigured()){ const idx = DATA.findIndex(x => x.id === record.id); if(idx >= 0) DATA[idx] = record; else DATA.push(record); localBackupSave(DATA); return record; }
+      const res = await api('save', record); return res.record || record;
     }
+    async function deleteRecordOnline(id){ if(!isConfigured()){ DATA = DATA.filter(x => x.id !== id); localBackupSave(DATA); return; } await api('delete', { id }); }
+    async function clearAllOnline(){ if(!isConfigured()){ DATA = []; localBackupSave(DATA); return; } await api('clear'); }
 
-    function renderChips(values = getSelectedEquipos()){
-      $('selectedChips').innerHTML = values.map(v => `<span class="chip">${escapeHtml(v)}</span>`).join('');
-    }
-
-    function resetForm(){
-      form.reset();
-      editId.value = '';
-      estado.value = 'Pendiente';
-      fecha.valueAsDate = new Date();
-      Array.from(equipos.options).forEach(o => o.selected = false);
-      renderChips([]);
-    }
-
-    function getStatusClass(value){
-      if(value === 'Aprobado') return 'approved';
-      if(value === 'Rechazado') return 'rejected';
-      return 'pending';
-    }
-
-    function escapeHtml(text){
-      return String(text ?? '')
-        .replaceAll('&','&amp;')
-        .replaceAll('<','&lt;')
-        .replaceAll('>','&gt;')
-        .replaceAll('"','&quot;')
-        .replaceAll("'","&#039;");
-    }
+    function getSelectedEquipos(){ return Array.from(equipos.selectedOptions).map(o => o.value); }
+    function renderChips(values = getSelectedEquipos()){ $('selectedChips').innerHTML = values.map(v => `<span class="chip">${escapeHtml(v)}</span>`).join(''); }
+    function resetForm(){ form.reset(); editId.value = ''; estado.value = 'Pendiente'; fecha.valueAsDate = new Date(); Array.from(equipos.options).forEach(o => o.selected = false); renderChips([]); }
+    function getStatusClass(value){ if(value === 'Aprobado') return 'approved'; if(value === 'Rechazado') return 'rejected'; return 'pending'; }
+    function escapeHtml(text){ return String(text ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;"); }
 
     function buildRecordFromForm(){
-      return {
-        id: editId.value || (window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
-        nombre: nombre.value.trim(),
-        rut: rut.value.trim(),
-        telefono: telefono.value.trim(),
-        correo: correo.value.trim(),
-        fecha: fecha.value,
-        cargo: cargo.value.trim(),
-        equipos: getSelectedEquipos(),
-        experiencia: experiencia.value.trim(),
-        estado: estado.value,
-        observaciones: observaciones.value.trim(),
-        updatedAt: new Date().toISOString()
-      };
+      return { id: editId.value || (window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())), nombre: nombre.value.trim(), rut: rut.value.trim(), telefono: telefono.value.trim(), correo: correo.value.trim(), fecha: fecha.value, cargo: cargo.value.trim(), equipos: getSelectedEquipos(), experiencia: experiencia.value.trim(), estado: estado.value, observaciones: observaciones.value.trim(), updatedAt: new Date().toISOString() };
     }
+    function validateRecord(record){ if(!record.nombre){ alert('Ingresa el nombre del postulante.'); return false; } if(!record.fecha){ alert('Ingresa la fecha de entrevista.'); return false; } if(!record.cargo){ alert('Ingresa el cargo al que postula.'); return false; } if(!record.equipos.length){ alert('Selecciona al menos un equipo.'); return false; } return true; }
 
-    function validateRecord(record){
-      if(!record.nombre) { alert('Ingresa el nombre del postulante.'); return false; }
-      if(!record.fecha) { alert('Ingresa la fecha de entrevista.'); return false; }
-      if(!record.cargo) { alert('Ingresa el cargo al que postula.'); return false; }
-      if(!record.equipos.length) { alert('Selecciona al menos un equipo.'); return false; }
-      return true;
-    }
-
-    function upsertRecord(record){
-      const data = loadData();
-      const idx = data.findIndex(x => x.id === record.id);
-      if(idx >= 0) data[idx] = record;
-      else data.push(record);
-      saveData(data);
-      return record;
-    }
-
-    function saveCurrentRecord(){
-      const record = buildRecordFromForm();
-      if(!validateRecord(record)) return null;
-      upsertRecord(record);
-      render();
-      return record;
+    async function saveCurrentRecord(){
+      const record = buildRecordFromForm(); if(!validateRecord(record)) return null;
+      setSyncStatus('Guardando registro...', 'warn');
+      try{ await saveRecordOnline(record); await loadData(); setSyncStatus(isConfigured() ? 'Guardado en Google Sheets' : 'Guardado en respaldo local', isConfigured() ? 'ok' : 'warn'); return record; }
+      catch(err){ console.error(err); alert('No se pudo guardar: ' + err.message); setSyncStatus('Error al guardar', 'bad'); return null; }
     }
 
     function render(){
-      const data = loadData();
-
-      const text = filtroTexto.value.trim().toLowerCase();
-      const est = filtroEstado.value;
-      const car = filtroCargo.value.trim().toLowerCase();
-
-      const filtered = data.filter(r => {
-        const blob = [
-          r.nombre, r.rut, r.telefono, r.correo, r.cargo, (r.equipos || []).join(' '), r.estado, r.observaciones
-        ].join(' ').toLowerCase();
-
-        const okText = !text || blob.includes(text);
-        const okEstado = !est || r.estado === est;
-        const okCargo = !car || (r.cargo || '').toLowerCase().includes(car);
-        return okText && okEstado && okCargo;
-      });
-
+      const data = DATA || []; const text = filtroTexto.value.trim().toLowerCase(); const est = filtroEstado.value; const car = filtroCargo.value.trim().toLowerCase();
+      const filtered = data.filter(r => { const blob = [r.nombre, r.rut, r.telefono, r.correo, r.cargo, Array.isArray(r.equipos) ? r.equipos.join(' ') : r.equipos, r.estado, r.observaciones].join(' ').toLowerCase(); return (!text || blob.includes(text)) && (!est || r.estado === est) && (!car || (r.cargo || '').toLowerCase().includes(car)); });
       tablaBody.innerHTML = '';
-      filtered
-        .sort((a,b) => (b.fecha || '').localeCompare(a.fecha || ''))
-        .forEach(row => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${escapeHtml(row.fecha)}<div class="muted">${escapeHtml(row.rut)}</div></td>
-            <td>
-              <strong>${escapeHtml(row.nombre)}</strong>
-              <div class="muted">${escapeHtml(row.telefono)}</div>
-              <div class="muted">${escapeHtml(row.correo)}</div>
-            </td>
-            <td>${escapeHtml(row.cargo)}<div class="muted">${row.experiencia ? escapeHtml(String(row.experiencia)) + ' años' : ''}</div></td>
-            <td>${escapeHtml((row.equipos || []).join(', '))}</td>
-            <td><span class="tag ${getStatusClass(row.estado)}">${escapeHtml(row.estado)}</span></td>
-            <td>${escapeHtml(row.observaciones)}</td>
-            <td>
-              <button class="mini-btn btn-secondary" onclick="editRecord('${row.id}')">Editar</button>
-              <button class="mini-btn btn-pdf" onclick="downloadRecordPdf('${row.id}')">PDF</button>
-              <button class="mini-btn btn-danger" onclick="deleteRecord('${row.id}')">Eliminar</button>
-            </td>
-          `;
-          tablaBody.appendChild(tr);
-        });
-
-      stTotal.textContent = data.length;
-      stAprobado.textContent = data.filter(x => x.estado === 'Aprobado').length;
-      stRechazado.textContent = data.filter(x => x.estado === 'Rechazado').length;
-      stPendiente.textContent = data.filter(x => x.estado === 'Pendiente').length;
+      filtered.sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '')).forEach(row => {
+        const equiposTxt = Array.isArray(row.equipos) ? row.equipos.join(', ') : (row.equipos || '');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${escapeHtml(row.fecha)}<div class="muted">${escapeHtml(row.rut)}</div></td><td><strong>${escapeHtml(row.nombre)}</strong><div class="muted">${escapeHtml(row.telefono)}</div><div class="muted">${escapeHtml(row.correo)}</div></td><td>${escapeHtml(row.cargo)}<div class="muted">${row.experiencia ? escapeHtml(String(row.experiencia)) + ' años' : ''}</div></td><td>${escapeHtml(equiposTxt)}</td><td><span class="tag ${getStatusClass(row.estado)}">${escapeHtml(row.estado)}</span></td><td>${escapeHtml(row.observaciones)}</td><td><button class="mini-btn btn-secondary" onclick="editRecord('${row.id}')">Editar</button><button class="mini-btn btn-pdf" onclick="downloadRecordPdf('${row.id}')">PDF</button><button class="mini-btn btn-danger" onclick="deleteRecord('${row.id}')">Eliminar</button></td>`;
+        tablaBody.appendChild(tr);
+      });
+      stTotal.textContent = data.length; stAprobado.textContent = data.filter(x => x.estado === 'Aprobado').length; stRechazado.textContent = data.filter(x => x.estado === 'Rechazado').length; stPendiente.textContent = data.filter(x => x.estado === 'Pendiente').length;
     }
 
-    function addWrappedText(doc, text, x, y, maxWidth, lineHeight){
-      const lines = doc.splitTextToSize(String(text || '-'), maxWidth);
-      doc.text(lines, x, y);
-      return y + (lines.length * lineHeight);
-    }
-
+    function addWrappedText(doc, text, x, y, maxWidth, lineHeight){ const lines = doc.splitTextToSize(String(text || '-'), maxWidth); doc.text(lines, x, y); return y + (lines.length * lineHeight); }
     function generatePdf(record){
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit:'mm', format:'a4' });
-      const margin = 15;
-      let y = 18;
-
-      doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, 210, 30, 'F');
-      doc.setTextColor(255,255,255);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(18);
-      doc.text('ENTREVISTA OPERACIONAL', margin, 15);
-      doc.setFontSize(11);
-      doc.text('XTREME Mining Ltda.', margin, 23);
-
-      doc.setTextColor(23,32,42);
-      y = 40;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Datos del postulante', margin, y);
-      y += 8;
-
-      const fields = [
-        ['Nombre completo', record.nombre],
-        ['RUT', record.rut || '-'],
-        ['Teléfono', record.telefono || '-'],
-        ['Correo', record.correo || '-'],
-        ['Fecha entrevista', record.fecha || '-'],
-        ['Cargo al que postula', record.cargo || '-'],
-        ['Equipos que opera', (record.equipos || []).join(', ') || '-'],
-        ['Años de experiencia', record.experiencia || '-'],
-        ['Estado', record.estado || '-'],
-        ['Observaciones', record.observaciones || '-']
-      ];
-
-      fields.forEach(([label, value], index) => {
-        if(y > 260){
-          doc.addPage();
-          y = 20;
-        }
-        doc.setFillColor(index % 2 === 0 ? 245 : 251, 247, 250);
-        doc.roundedRect(margin, y - 5, 180, 10, 2, 2, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.text(label + ':', margin + 3, y + 1.5);
-        doc.setFont('helvetica', 'normal');
-        y = addWrappedText(doc, value, 65, y + 1.5, 125, 5);
-        y += 5;
-      });
-
-      doc.setFontSize(8);
-      doc.setTextColor(90, 101, 115);
-      doc.text('Documento generado desde la base local del formulario HTML.', margin, 287);
-      doc.save(`Entrevista_${sanitizeFileName(record.nombre || 'postulante')}.pdf`);
+      const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit:'mm', format:'a4' }); const margin = 15; let y = 18;
+      doc.setFillColor(15, 23, 42); doc.rect(0, 0, 210, 30, 'F'); doc.setTextColor(255,255,255); doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.text('ENTREVISTA OPERACIONAL', margin, 15); doc.setFontSize(11); doc.text('XTREME Mining Ltda.', margin, 23);
+      doc.setTextColor(23,32,42); y = 40; doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('Datos del postulante', margin, y); y += 8;
+      const fields = [['Nombre completo', record.nombre], ['RUT', record.rut || '-'], ['Teléfono', record.telefono || '-'], ['Correo', record.correo || '-'], ['Fecha entrevista', record.fecha || '-'], ['Cargo al que postula', record.cargo || '-'], ['Equipos que opera', Array.isArray(record.equipos) ? record.equipos.join(', ') : (record.equipos || '-')], ['Años de experiencia', record.experiencia || '-'], ['Estado', record.estado || '-'], ['Observaciones', record.observaciones || '-']];
+      fields.forEach(([label, value], index) => { if(y > 260){ doc.addPage(); y = 20; } doc.setFillColor(index % 2 === 0 ? 245 : 251, 247, 250); doc.roundedRect(margin, y - 5, 180, 10, 2, 2, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.text(label + ':', margin + 3, y + 1.5); doc.setFont('helvetica', 'normal'); y = addWrappedText(doc, value, 65, y + 1.5, 125, 5); y += 5; });
+      doc.setFontSize(8); doc.setTextColor(90, 101, 115); doc.text('Documento generado desde sistema online conectado a Google Sheets.', margin, 287); doc.save(`Entrevista_${sanitizeFileName(record.nombre || 'postulante')}.pdf`);
     }
+    function sanitizeFileName(text){ return String(text || 'archivo').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, ''); }
 
-    function sanitizeFileName(text){
-      return String(text || 'archivo')
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^\w\-]+/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '');
-    }
+    window.editRecord = function(id){ const r = DATA.find(x => x.id === id); if(!r) return; editId.value = r.id; nombre.value = r.nombre || ''; rut.value = r.rut || ''; telefono.value = r.telefono || ''; correo.value = r.correo || ''; fecha.value = r.fecha || ''; cargo.value = r.cargo || ''; experiencia.value = r.experiencia || ''; estado.value = r.estado || 'Pendiente'; observaciones.value = r.observaciones || ''; const arrEquipos = Array.isArray(r.equipos) ? r.equipos : String(r.equipos || '').split('|').map(x => x.trim()).filter(Boolean); Array.from(equipos.options).forEach(o => o.selected = arrEquipos.includes(o.value)); renderChips(arrEquipos); window.scrollTo({top:0, behavior:'smooth'}); }
+    window.deleteRecord = async function(id){ if(!confirm('¿Deseas eliminar este registro de la base compartida?')) return; setSyncStatus('Eliminando registro...', 'warn'); try{ await deleteRecordOnline(id); await loadData(); }catch(err){ alert('No se pudo eliminar: ' + err.message); setSyncStatus('Error al eliminar', 'bad'); } }
+    window.downloadRecordPdf = function(id){ const record = DATA.find(x => x.id === id); if(!record) return alert('No se encontró el registro.'); generatePdf(record); }
 
-    window.editRecord = function(id){
-      const r = loadData().find(x => x.id === id);
-      if(!r) return;
-      editId.value = r.id;
-      nombre.value = r.nombre || '';
-      rut.value = r.rut || '';
-      telefono.value = r.telefono || '';
-      correo.value = r.correo || '';
-      fecha.value = r.fecha || '';
-      cargo.value = r.cargo || '';
-      experiencia.value = r.experiencia || '';
-      estado.value = r.estado || 'Pendiente';
-      observaciones.value = r.observaciones || '';
-      Array.from(equipos.options).forEach(o => o.selected = (r.equipos || []).includes(o.value));
-      renderChips(r.equipos || []);
-      window.scrollTo({top:0, behavior:'smooth'});
-    }
-
-    window.deleteRecord = function(id){
-      if(!confirm('¿Deseas eliminar este registro?')) return;
-      saveData(loadData().filter(x => x.id !== id));
-      render();
-    }
-
-    window.downloadRecordPdf = function(id){
-      const record = loadData().find(x => x.id === id);
-      if(!record) return alert('No se encontró el registro.');
-      generatePdf(record);
-    }
-
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      const record = saveCurrentRecord();
-      if(record){
-        resetForm();
-        render();
-      }
-    });
-
-    $('savePdfBtn').addEventListener('click', () => {
-      const record = saveCurrentRecord();
-      if(!record) return;
-      generatePdf(record);
-      resetForm();
-      render();
-    });
-
+    form.addEventListener('submit', async e => { e.preventDefault(); const record = await saveCurrentRecord(); if(record){ resetForm(); render(); } });
+    $('savePdfBtn').addEventListener('click', async () => { const record = await saveCurrentRecord(); if(!record) return; generatePdf(record); resetForm(); render(); });
     $('resetBtn').addEventListener('click', resetForm);
-
-    $('clearAllBtn').addEventListener('click', () => {
-      if(!confirm('Esto eliminará todos los registros guardados en este navegador. ¿Continuar?')) return;
-      localStorage.removeItem(STORAGE_KEY);
-      resetForm();
-      render();
-    });
-
-    $('exportBtn').addEventListener('click', () => {
-      const data = loadData();
-      if(!data.length) {
-        alert('No hay datos para exportar.');
-        return;
-      }
-      const headers = ['Fecha','Nombre','RUT','Telefono','Correo','Cargo','Equipos','Experiencia','Estado','Observaciones'];
-      const rows = data.map(r => [
-        r.fecha, r.nombre, r.rut, r.telefono, r.correo, r.cargo, (r.equipos || []).join(' | '), r.experiencia, r.estado, r.observaciones
-      ]);
-      const csv = [headers, ...rows]
-        .map(row => row.map(value => `"${String(value ?? '').replaceAll('"','""')}"`).join(';'))
-        .join('\n');
-
-      const blob = new Blob(["\ufeff" + csv], {type:'text/csv;charset=utf-8;'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'entrevistas_xtreme_mining.csv';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-
-    $('exportAllPdfBtn').addEventListener('click', () => {
-      const data = loadData();
-      if(!data.length) return alert('No hay registros guardados.');
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit:'mm', format:'a4' });
-      let y = 15;
-
-      doc.setFont('helvetica','bold');
-      doc.setFontSize(16);
-      doc.text('Resumen de entrevistas operacionales', 14, y);
-      y += 8;
-      doc.setFont('helvetica','normal');
-      doc.setFontSize(10);
-      doc.text(`Total registros: ${data.length}`, 14, y);
-      y += 8;
-
-      data.sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '')).forEach((r, idx) => {
-        if(y > 260){
-          doc.addPage();
-          y = 15;
-        }
-        doc.setFont('helvetica','bold');
-        doc.text(`${idx + 1}. ${r.nombre}`, 14, y);
-        y += 5;
-        doc.setFont('helvetica','normal');
-        const block = [
-          `Fecha: ${r.fecha || '-'}`,
-          `Cargo: ${r.cargo || '-'}`,
-          `Equipos: ${(r.equipos || []).join(', ') || '-'}`,
-          `Estado: ${r.estado || '-'}`,
-          `Observaciones: ${r.observaciones || '-'}`
-        ];
-        block.forEach(line => {
-          const lines = doc.splitTextToSize(line, 180);
-          doc.text(lines, 18, y);
-          y += lines.length * 4.5;
-        });
-        y += 4;
-      });
-
-      doc.save('Resumen_entrevistas_operacionales.pdf');
-    });
-
-    equipos.addEventListener('change', () => renderChips());
-    [filtroTexto, filtroCargo].forEach(el => el.addEventListener('input', render));
-    filtroEstado.addEventListener('change', render);
-
-    resetForm();
-    render();
+    $('clearAllBtn').addEventListener('click', async () => { if(!confirm('Esto eliminará todos los registros de la base compartida. ¿Continuar?')) return; try{ await clearAllOnline(); await loadData(); }catch(err){ alert('No se pudo borrar todo: ' + err.message); } });
+    $('exportBtn').addEventListener('click', () => { const data = DATA || []; if(!data.length){ alert('No hay datos para exportar.'); return; } const headers = ['Fecha','Nombre','RUT','Telefono','Correo','Cargo','Equipos','Experiencia','Estado','Observaciones']; const rows = data.map(r => [r.fecha, r.nombre, r.rut, r.telefono, r.correo, r.cargo, Array.isArray(r.equipos) ? r.equipos.join(' | ') : r.equipos, r.experiencia, r.estado, r.observaciones]); const csv = [headers, ...rows].map(row => row.map(value => `"${String(value ?? '').replaceAll('"','""')}"`).join(';')).join('\n'); const blob = new Blob(["\ufeff" + csv], {type:'text/csv;charset=utf-8;'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'entrevistas_xtreme_mining_online.csv'; a.click(); URL.revokeObjectURL(url); });
+    $('exportAllPdfBtn').addEventListener('click', () => { const data = [...(DATA || [])]; if(!data.length) return alert('No hay registros guardados.'); const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit:'mm', format:'a4' }); let y = 15; doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.text('Resumen de entrevistas operacionales', 14, y); y += 8; doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.text(`Total registros: ${data.length}`, 14, y); y += 8; data.sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '')).forEach((r, idx) => { if(y > 260){ doc.addPage(); y = 15; } doc.setFont('helvetica','bold'); doc.text(`${idx + 1}. ${r.nombre}`, 14, y); y += 5; doc.setFont('helvetica','normal'); const equiposTxt = Array.isArray(r.equipos) ? r.equipos.join(', ') : (r.equipos || '-'); [`Fecha: ${r.fecha || '-'}`, `Cargo: ${r.cargo || '-'}`, `Equipos: ${equiposTxt}`, `Estado: ${r.estado || '-'}`, `Observaciones: ${r.observaciones || '-'}`].forEach(line => { const lines = doc.splitTextToSize(line, 180); doc.text(lines, 18, y); y += lines.length * 4.5; }); y += 4; }); doc.save('Resumen_entrevistas_operacionales_online.pdf'); });
+    equipos.addEventListener('change', () => renderChips()); [filtroTexto, filtroCargo].forEach(el => el.addEventListener('input', render)); filtroEstado.addEventListener('change', render);
+    resetForm(); loadData();
   </script>
 </body>
 </html>
