@@ -301,7 +301,7 @@
   </div>
 
   <script>
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz5NNPTxskn8nXXuKMi9RyHW1ePzVKv4ZY5q-LnZqXssPH1hmRKnPTTFewbm-PnyvjX/exec';
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzQOYmozkEpqHhj6C2KfyyY-Q54iVGvxEmC9mJCDrJUJh3MYuajidBb-JTMOzc8_Cb_/exec';
     const LOCAL_BACKUP_KEY = 'xtreme_entrevistas_online_backup_v1';
     const $ = id => document.getElementById(id);
 
@@ -348,9 +348,10 @@
 
     function getSelectedEquipos(){ return Array.from(equipos.selectedOptions).map(o => o.value); }
     function renderChips(values = getSelectedEquipos()){ $('selectedChips').innerHTML = values.map(v => `<span class="chip">${escapeHtml(v)}</span>`).join(''); }
-    function resetForm(){ form.reset(); editId.value = ''; estado.value = 'Pendiente'; fecha.valueAsDate = new Date(); Array.from(equipos.options).forEach(o => o.selected = false); renderChips([]); }
+    function resetForm(){ form.reset(); editId.value = ''; estado.value = 'Pendiente'; fecha.valueAsDate = new Date(); Array.from(equipos.options).forEach(o => o.selected = false); renderChips([]); const btn = form.querySelector('button[type="submit"]'); if(btn) btn.textContent = 'Guardar entrevista'; }
     function getStatusClass(value){ if(value === 'Aprobado') return 'approved'; if(value === 'Rechazado') return 'rejected'; return 'pending'; }
     function escapeHtml(text){ return String(text ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;"); }
+    function escapeAttr(text){ return escapeHtml(text); }
 
     function buildRecordFromForm(){
       return { id: editId.value || (window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())), nombre: nombre.value.trim(), rut: rut.value.trim(), telefono: telefono.value.trim(), correo: correo.value.trim(), fecha: fecha.value, cargo: cargo.value.trim(), equipos: getSelectedEquipos(), experiencia: experiencia.value.trim(), estado: estado.value, observaciones: observaciones.value.trim(), updatedAt: new Date().toISOString() };
@@ -371,7 +372,7 @@
       filtered.sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '')).forEach(row => {
         const equiposTxt = Array.isArray(row.equipos) ? row.equipos.join(', ') : (row.equipos || '');
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escapeHtml(row.fecha)}<div class="muted">${escapeHtml(row.rut)}</div></td><td><strong>${escapeHtml(row.nombre)}</strong><div class="muted">${escapeHtml(row.telefono)}</div><div class="muted">${escapeHtml(row.correo)}</div></td><td>${escapeHtml(row.cargo)}<div class="muted">${row.experiencia ? escapeHtml(String(row.experiencia)) + ' años' : ''}</div></td><td>${escapeHtml(equiposTxt)}</td><td><span class="tag ${getStatusClass(row.estado)}">${escapeHtml(row.estado)}</span></td><td>${escapeHtml(row.observaciones)}</td><td><button class="mini-btn btn-secondary" onclick="editRecord('${row.id}')">Editar</button><button class="mini-btn btn-pdf" onclick="downloadRecordPdf('${row.id}')">PDF</button><button class="mini-btn btn-danger" onclick="deleteRecord('${row.id}')">Eliminar</button></td>`;
+        tr.innerHTML = `<td>${escapeHtml(row.fecha)}<div class="muted">${escapeHtml(row.rut)}</div></td><td><strong>${escapeHtml(row.nombre)}</strong><div class="muted">${escapeHtml(row.telefono)}</div><div class="muted">${escapeHtml(row.correo)}</div></td><td>${escapeHtml(row.cargo)}<div class="muted">${row.experiencia ? escapeHtml(String(row.experiencia)) + ' años' : ''}</div></td><td>${escapeHtml(equiposTxt)}</td><td><span class="tag ${getStatusClass(row.estado)}">${escapeHtml(row.estado)}</span></td><td>${escapeHtml(row.observaciones)}</td><td><button class="mini-btn btn-secondary" onclick="editRecordById(this.dataset.id)" data-id="${escapeAttr(row.id)}">Editar</button><button class="mini-btn btn-pdf" onclick="downloadRecordPdfById(this.dataset.id)" data-id="${escapeAttr(row.id)}">PDF</button><button class="mini-btn btn-danger" onclick="deleteRecordById(this.dataset.id)" data-id="${escapeAttr(row.id)}">Eliminar</button></td>`;
         tablaBody.appendChild(tr);
       });
       stTotal.textContent = data.length; stAprobado.textContent = data.filter(x => x.estado === 'Aprobado').length; stRechazado.textContent = data.filter(x => x.estado === 'Rechazado').length; stPendiente.textContent = data.filter(x => x.estado === 'Pendiente').length;
@@ -388,9 +389,29 @@
     }
     function sanitizeFileName(text){ return String(text || 'archivo').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, ''); }
 
-    window.editRecord = function(id){ const r = DATA.find(x => x.id === id); if(!r) return; editId.value = r.id; nombre.value = r.nombre || ''; rut.value = r.rut || ''; telefono.value = r.telefono || ''; correo.value = r.correo || ''; fecha.value = r.fecha || ''; cargo.value = r.cargo || ''; experiencia.value = r.experiencia || ''; estado.value = r.estado || 'Pendiente'; observaciones.value = r.observaciones || ''; const arrEquipos = Array.isArray(r.equipos) ? r.equipos : String(r.equipos || '').split('|').map(x => x.trim()).filter(Boolean); Array.from(equipos.options).forEach(o => o.selected = arrEquipos.includes(o.value)); renderChips(arrEquipos); window.scrollTo({top:0, behavior:'smooth'}); }
-    window.deleteRecord = async function(id){ if(!confirm('¿Deseas eliminar este registro de la base compartida?')) return; setSyncStatus('Eliminando registro...', 'warn'); try{ await deleteRecordOnline(id); await loadData(); }catch(err){ alert('No se pudo eliminar: ' + err.message); setSyncStatus('Error al eliminar', 'bad'); } }
-    window.downloadRecordPdf = function(id){ const record = DATA.find(x => x.id === id); if(!record) return alert('No se encontró el registro.'); generatePdf(record); }
+    window.editRecordById = function(id){
+      const r = DATA.find(x => String(x.id) === String(id));
+      if(!r) return alert('No se encontró el registro seleccionado. Actualiza la página y vuelve a intentar.');
+      editId.value = r.id;
+      nombre.value = r.nombre || '';
+      rut.value = r.rut || '';
+      telefono.value = r.telefono || '';
+      correo.value = r.correo || '';
+      fecha.value = r.fecha || '';
+      cargo.value = r.cargo || '';
+      experiencia.value = r.experiencia || '';
+      estado.value = r.estado || 'Pendiente';
+      observaciones.value = r.observaciones || '';
+      const arrEquipos = Array.isArray(r.equipos) ? r.equipos : String(r.equipos || '').split('|').map(x => x.trim()).filter(Boolean);
+      Array.from(equipos.options).forEach(o => o.selected = arrEquipos.includes(o.value));
+      renderChips(arrEquipos);
+      setSyncStatus('Editando: ' + (r.nombre || 'registro seleccionado'), 'warn');
+      const btn = form.querySelector('button[type="submit"]');
+      if(btn) btn.textContent = 'Guardar cambios';
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+    window.deleteRecordById = async function(id){ if(!confirm('¿Deseas eliminar este registro de la base compartida?')) return; setSyncStatus('Eliminando registro...', 'warn'); try{ await deleteRecordOnline(id); await loadData(); }catch(err){ alert('No se pudo eliminar: ' + err.message); setSyncStatus('Error al eliminar', 'bad'); } }
+    window.downloadRecordPdfById = function(id){ const record = DATA.find(x => String(x.id) === String(id)); if(!record) return alert('No se encontró el registro.'); generatePdf(record); }
 
     form.addEventListener('submit', async e => { e.preventDefault(); const record = await saveCurrentRecord(); if(record){ resetForm(); render(); } });
     $('savePdfBtn').addEventListener('click', async () => { const record = await saveCurrentRecord(); if(!record) return; generatePdf(record); resetForm(); render(); });
